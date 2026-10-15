@@ -22,6 +22,8 @@ type Credential struct {
 	HolderKey map[string]any
 	// ExpiresAt is optional.
 	ExpiresAt time.Time
+	// Status is optional: where a verifier finds out whether the credential was revoked.
+	Status *StatusReference
 	// Claims are always visible; Disclosable ones are only revealed when the holder includes their disclosure.
 	Claims      map[string]any
 	Disclosable map[string]any
@@ -29,7 +31,7 @@ type Credential struct {
 	Now func() time.Time
 }
 
-var reservedClaims = []string{"iss", "iat", "exp", "vct", "cnf", "_sd", "_sd_alg", "..."}
+var reservedClaims = []string{"iss", "iat", "exp", "vct", "cnf", "status", "_sd", "_sd_alg", "..."}
 
 // Issue signs the credential with an Ed25519 key and returns `<issuer-signed JWT>~<disclosure>~...~`, the form a holder stores.
 // The issuer is the key's `did:key`.
@@ -63,6 +65,12 @@ func Issue(key ed25519.PrivateKey, c Credential) (string, error) {
 	payload := jwt.MapClaims{"iss": issuer, "iat": now().Unix(), "vct": c.Type, "cnf": holderClaims, "_sd_alg": sdAlgSHA256}
 	if !c.ExpiresAt.IsZero() {
 		payload["exp"] = c.ExpiresAt.Unix()
+	}
+	if c.Status != nil {
+		if c.Status.URI == "" || c.Status.Index < 0 {
+			return "", errors.New("invalid status reference")
+		}
+		payload["status"] = map[string]any{"status_list": map[string]any{"idx": c.Status.Index, "uri": c.Status.URI}}
 	}
 	for name, v := range c.Claims {
 		payload[name] = v

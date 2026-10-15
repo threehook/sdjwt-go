@@ -42,6 +42,8 @@ type Verified struct {
 	Type string
 	// Claims are the issuer-signed claims with the disclosed ones filled in. Undisclosed claims are absent.
 	Claims map[string]any
+	// Status is where to check whether the credential was revoked; nil when the credential has no status claim.
+	Status *StatusReference
 }
 
 const (
@@ -127,7 +129,11 @@ func Verify(presentation string, o Options) (*Verified, error) {
 		return nil, errors.New("credential has no vct")
 	}
 	delete(expanded, "_sd_alg")
-	return &Verified{Issuer: issuer, Type: vct, Claims: expanded}, nil
+	status, err := statusOf(expanded)
+	if err != nil {
+		return nil, err
+	}
+	return &Verified{Issuer: issuer, Type: vct, Claims: expanded, Status: status}, nil
 }
 
 func verifyKeyBinding(token string, key crypto.PublicKey, signed string, o Options, now time.Time, maxAge time.Duration) error {

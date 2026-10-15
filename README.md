@@ -57,8 +57,25 @@ type KeyResolver interface {
 }
 ```
 
+## Revocation
+
+An issuer sets `Credential.Status` (index and list URI) and publishes a signed status list
+([draft-ietf-oauth-status-list](https://datatracker.ietf.org/doc/draft-ietf-oauth-status-list/)), one bit per credential, 1 = revoked.
+`Verify` returns the reference in `Verified.Status`; checking the bit is up to the caller, who fetches the list.
+
+```go
+list := sdjwt.NewStatusList(1024)
+list.SetRevoked(7, true)
+token, err := sdjwt.SignStatusList(issuerKey, "https://issuer.example/status/1", list, 5*time.Minute, time.Now().Add(time.Hour), nil)
+
+st, err := sdjwt.VerifyStatusList(token, sdjwt.DIDKey{}, nil)
+// st.Issuer, st.URI (compare with v.Issuer and v.Status.URI), st.TTL, st.ExpiresAt
+revoked, err := st.List.Revoked(v.Status.Index)
+```
+
 ## Limits
 
+- Status lists use 1 bit per credential.
 - Digest algorithm `sha-256` only.
 - Issuing signs with Ed25519. Verifying accepts EdDSA and ES256, for the issuer and for the holder.
 - Holder keys in `cnf.jwk` are Ed25519 or P-256.
